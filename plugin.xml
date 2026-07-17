@@ -1,0 +1,101 @@
+<?xml version='1.0' encoding='utf-8'?>
+<plugin id="cordova-plugin-truid" version="1.1.0"
+    xmlns="http://apache.org/cordova/ns/plugins/1.0"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <name>TruID Plugin</name>
+    <description>Cordova plugin integrating the native TruID identity-verification SDK (Android and iOS) for Ionic/Cordova apps</description>
+    <license>MIT</license>
+    <author>Tufail Zaman</author>
+    <keywords>truid, identity, verification, kyc, liveness, cordova, ionic</keywords>
+
+    <engines>
+        <engine name="cordova" version=">=10.0.0" />
+        <engine name="cordova-android" version=">=10.0.0" />
+        <engine name="cordova-ios" version=">=6.2.0" />
+    </engines>
+
+    <js-module src="www/TruIDPlugin.js" name="TruIDPlugin">
+        <clobbers target="cordova.plugins.TruIDPlugin" />
+    </js-module>
+
+    <!-- ================= Android ================= -->
+    <platform name="android">
+        <!-- The TruID SDK's AndroidX/Compose dependencies require AGP 8, which
+             demands an explicit `namespace` per module. cordova-android 10.x's
+             generated build files predate that, so this hook injects:
+               - namespace "org.apache.cordova" into CordovaLib/build.gradle
+               - namespace "<your widget id>"  into app/build.gradle
+             It re-runs on platform add / prepare / build, so the patch
+             survives platform re-creation. -->
+        <hook type="after_platform_add" src="hooks/android-agp8-namespace.js" />
+        <hook type="after_prepare" src="hooks/android-agp8-namespace.js" />
+        <hook type="before_build" src="hooks/android-agp8-namespace.js" />
+
+        <config-file target="config.xml" parent="/*">
+            <feature name="TruIDPlugin">
+                <param name="android-package" value="com.truid.plugin.TruIDPlugin" />
+            </feature>
+        </config-file>
+
+        <config-file target="AndroidManifest.xml" parent="/manifest">
+            <uses-permission android:name="android.permission.INTERNET" />
+            <uses-permission android:name="android.permission.CAMERA" />
+            <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+            <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+        </config-file>
+
+        <source-file src="src/android/TruIDPlugin.java"
+            target-dir="src/com/truid/plugin" />
+
+        <framework src="src/android/truid.gradle" custom="true" type="gradleReference" />
+    </platform>
+
+    <!-- ================= iOS ================= -->
+    <platform name="ios">
+        <config-file target="config.xml" parent="/*">
+            <feature name="TruIDPlugin">
+                <param name="ios-package" value="TruIDPlugin" />
+            </feature>
+        </config-file>
+
+        <!-- Usage descriptions required by the SDK's capture flows. Override
+             the texts at install time with the CLI "variable" flags, e.g.
+             cordova plugin add cordova-plugin-truid (dash)(dash)variable CAMERA_USAGE_DESCRIPTION="...";
+             see INTEGRATION.md for exact syntax. -->
+        <preference name="CAMERA_USAGE_DESCRIPTION"
+            default="We need camera access to verify your identity document and take a selfie." />
+        <preference name="PHOTO_LIBRARY_USAGE_DESCRIPTION"
+            default="We need photo library access to upload identity documents." />
+        <preference name="LOCATION_USAGE_DESCRIPTION"
+            default="We need location access to launch truID verification." />
+        <preference name="MICROPHONE_USAGE_DESCRIPTION"
+            default="We need microphone access for liveness verification." />
+
+        <config-file target="*-Info.plist" parent="NSCameraUsageDescription">
+            <string>$CAMERA_USAGE_DESCRIPTION</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSPhotoLibraryUsageDescription">
+            <string>$PHOTO_LIBRARY_USAGE_DESCRIPTION</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSLocationWhenInUseUsageDescription">
+            <string>$LOCATION_USAGE_DESCRIPTION</string>
+        </config-file>
+        <config-file target="*-Info.plist" parent="NSMicrophoneUsageDescription">
+            <string>$MICROPHONE_USAGE_DESCRIPTION</string>
+        </config-file>
+
+        <source-file src="src/ios/TruIDPlugin.swift" />
+
+        <!-- The TruID iOS SDK ships as Swift Packages, NOT CocoaPods, and
+             Cordova cannot declare SPM dependencies. After adding the ios
+             platform, add these packages to the App target in Xcode
+             (File > Add Package Dependencies):
+               https://github.com/truid-ai/TruIDPackage      (1.8.x)
+               https://github.com/truid-ai/T5AirSnapPackage  (latest)
+               https://github.com/airbnb/lottie-ios          (3.4.x)
+               https://github.com/Alamofire/Alamofire        (5.6.x)
+             See INTEGRATION.md section "iOS". -->
+    </platform>
+
+</plugin>

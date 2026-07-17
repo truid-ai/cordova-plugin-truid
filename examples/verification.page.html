@@ -1,0 +1,44 @@
+<ion-header>
+    <ion-toolbar color="primary">
+        <ion-title>Identity Verification</ion-title>
+    </ion-toolbar>
+</ion-header>
+
+<ion-content>
+    <ion-card>
+        <ion-card-header>
+            <ion-card-title>Verify Your Identity</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+            <p>Complete the verification process to confirm your identity.</p>
+
+            <ion-button
+                (click)="startVerification()"
+                [disabled]="isVerifying"
+                expand="block">
+                <ion-spinner *ngIf="isVerifying" name="crescent"></ion-spinner>
+                {{ isVerifying ? 'Verifying...' : 'Start Verification' }}
+            </ion-button>
+
+            <ion-card *ngIf="result" color="success" class="result-card">
+                <ion-card-header>
+                    <ion-card-title>Success</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <p>Session ID: {{ result.sessionId }}</p>
+                    <p *ngIf="result.verificationStatus">Status: {{ result.verificationStatus }}</p>
+                </ion-card-content>
+            </ion-card>
+
+            <ion-card *ngIf="errorMessage" color="danger" class="result-card">
+                <ion-card-header>
+                    <ion-card-title>Error</ion-card-title>
+                </ion-card-header>
+                <ion-card-content>
+                    <p>{{ errorMessage }}</p>
+                    <ion-button fill="outline" color="light" (click)="startVerification()">Retry</ion-button>
+                </ion-card-content>
+            </ion-card>
+        </ion-card-content>
+    </ion-card>
+</ion-content>

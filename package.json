@@ -1,0 +1,34 @@
+{
+  "name": "cordova-plugin-truid",
+  "version": "1.1.0",
+  "description": "Cordova plugin integrating the native TruID identity-verification SDK (Android & iOS) for Ionic/Cordova apps",
+  "cordova": {
+    "id": "cordova-plugin-truid",
+    "platforms": ["android", "ios"]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/TZK7/cordova-plugin-truid.git"
+  },
+  "keywords": [
+    "truid",
+    "identity",
+    "verification",
+    "kyc",
+    "liveness",
+    "ecosystem:cordova",
+    "cordova-android",
+    "cordova-ios"
+  ],
+  "engines": {
+    "cordovaDependencies": {
+      "1.0.0": {
+        "cordova": ">=10.0.0",
+        "cordova-android": ">=10.0.0",
+        "cordova-ios": ">=6.2.0"
+      }
+    }
+  },
+  "author": "Tufail Zaman",
+  "license": "MIT"
+}

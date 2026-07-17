@@ -1,0 +1,23 @@
+// Gradle configuration merged into the host app's build by Cordova
+// (gradleReference). The TruID Android SDK is public on JitPack.
+//
+// NOTE: module namespaces (an AGP 8 requirement) are NOT set here because
+// they differ per host app - the plugin's hooks/android-agp8-namespace.js
+// injects them into the generated build files instead.
+
+repositories {
+    google()
+    mavenCentral()
+    maven { url "https://jitpack.io" }
+}
+
+dependencies {
+    implementation "com.github.truid-ai:android-sdk:8.0.1"
+}
+
+android {
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+}
