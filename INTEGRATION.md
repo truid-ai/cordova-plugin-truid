@@ -42,7 +42,7 @@ cordova plugin add ../cordova-plugin-truid
 The plugin automatically brings with it:
 
 - the JS bridge (`cordova.plugins.TruIDPlugin`),
-- the Android SDK dependency (`com.github.truid-ai:android-sdk:8.0.1` from public JitPack) and required Android permissions,
+- the Android SDK dependency (`com.github.truid-ai:android-sdk:8.0.2` from public JitPack) and required Android permissions,
 - iOS `Info.plist` usage descriptions (override the texts with `--variable CAMERA_USAGE_DESCRIPTION="..."` etc. at install time),
 - a build hook that makes cordova-android 10's generated projects compatible with AGP 8 (injects the required `namespace` into `CordovaLib` and the app module — no action needed on your side).
 
@@ -169,7 +169,7 @@ A complete reference page (button, spinner, success/error cards) is in [`example
 | Component | Version |
 |---|---|
 | cordova-plugin-truid | 1.1.0 |
-| TruID Android SDK | `com.github.truid-ai:android-sdk:8.0.1` |
+| TruID Android SDK | `com.github.truid-ai:android-sdk:8.0.2` |
 | TruID iOS package | `truid-ai/TruIDPackage` 1.8.1 |
 | Host app | Ionic 4.11 / Angular 8.1 / Cordova CLI 10 / cordova-android 10.1.2 / cordova-ios 6.x |
 
