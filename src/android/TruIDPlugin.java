@@ -122,8 +122,17 @@ public class TruIDPlugin extends CordovaPlugin {
             JSONObject ret = new JSONObject();
             ret.put("sessionId", result.getSessionID() == null ? "" : result.getSessionID());
             ret.put("verificationStatus", result.getVerificationStatus());
-            ret.put("error", result.getError() == null ? "" : result.getError());
-            ret.put("statusCode", result.getStatusCode() == null ? "" : result.getStatusCode());
+            final String truidError = result.getError() == null ? "" : result.getError();
+            ret.put("error", truidError);
+            // On user cancel the SDK returns no status code (getStatusCode() is
+            // null) and only sets getError() == "user cancelled", which would
+            // surface as an empty statusCode. Map it to the documented 2017 so
+            // callers can handle cancel like any other outcome.
+            if ("user cancelled".equals(truidError)) {
+                ret.put("statusCode", "2017");
+            } else {
+                ret.put("statusCode", result.getStatusCode() == null ? "" : result.getStatusCode());
+            }
             callbackContext.success(ret);
         } catch (Exception e) {
             callbackContext.error("Error processing result: " + e.getMessage());

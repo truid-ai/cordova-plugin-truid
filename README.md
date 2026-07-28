@@ -26,7 +26,7 @@ console.log(result.sessionId);    // -> verify server-side with TruID
 | Path | Purpose |
 |---|---|
 | `www/TruIDPlugin.js` | JS bridge (`cordova.plugins.TruIDPlugin`, promise-based) |
-| `src/android/` | Java implementation + Gradle dependency (`com.github.truid-ai:android-sdk:8.0.2`, public JitPack) |
+| `src/android/` | Java implementation + Gradle dependency (`com.github.truid-ai:android-sdk:8.0.6`, public JitPack) |
 | `src/ios/` | Swift implementation (SDK via Swift Packages — see INTEGRATION.md) |
 | `hooks/` | Build hook making cordova-android 10 projects AGP-8 compatible (automatic) |
 | `examples/` | Typed TypeScript facade + a complete Ionic verification page |
