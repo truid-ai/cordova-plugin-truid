@@ -44,7 +44,7 @@ Cordova/AGP/JDK changes the requirements substantially.
 | JDK | **8** |
 | Gradle | **6.5** (AGP 4.0.0 does not work on Gradle 7.x) |
 | Android Gradle Plugin | **4.0.0** (shipped by cordova-android 9.1.0) |
-| truID Android SDK | **8.0.6-beta** (pulled from JitPack by the plugin) |
+| truID Android SDK | **8.0.6** (pulled from JitPack by the plugin) |
 
 **Android SDK components required on the build machine:**
 - **Platform API 31** installed (compileSdk 31).
@@ -66,7 +66,7 @@ cordova plugin add ../cordova-plugin-truid
 
 The plugin automatically brings:
 - the JavaScript bridge (`cordova.plugins.TruIDPlugin` / `cordova.exec`),
-- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.6-beta`, from JitPack),
+- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.6`, from JitPack),
 - the **dependency-version alignment** the SDK needs (compose, material, camera,
   lottie, okhttp, coroutines, etc.) so it builds under AGP 4.0.0,
 - the required Android permissions (Camera, Internet, Location).
