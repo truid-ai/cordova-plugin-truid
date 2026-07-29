@@ -122,23 +122,6 @@ targetSdk 31 requires it (Android 12+ rejects the install otherwise). In
 android:exported="true"
 ```
 
-### 4.6 WebView bridge fix (REQUIRED if you use cordova-plugin-ionic-webview)
-cordova-plugin-ionic-webview serves the app from `http://localhost`, but
-cordova-android 9.1.0's bridge only allows `file://` for JS→native access — so
-`cordova.exec` calls are silently dropped and **the SDK never launches** on newer
-Android System WebViews. In
-`platforms/android/CordovaLib/src/org/apache/cordova/PluginManager.java`, method
-`shouldAllowBridgeAccess`, change the default policy:
-```java
-// from:
-return url.startsWith("file://");
-// to:
-return url.startsWith("file://")
-    || url.startsWith("http://localhost")
-    || url.startsWith("https://localhost");
-```
- 
-
 ## 5. Calling the plugin from Angular / TypeScript
 
 The verification result arrives on a Cordova callback, which runs **outside
@@ -191,7 +174,8 @@ export class HomePage {
 Because several §4 settings are reset by `cordova prepare`, teams usually wrap the
 whole thing in a script that: builds the web bundle (Node 14) → `cordova prepare`
 → re-applies the §4.2–§4.6 patches → `gradlew assembleDebug` (JDK 8) → installs.
-Run that script instead of `cordova run android`.
+Run that script instead of `cordova run android`. you can use: ./run-android.sh but
+first contact truID team to fetch the .sh file for both platforms.
 
 ---
 
