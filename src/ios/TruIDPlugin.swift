@@ -41,9 +41,8 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
     func launchSDK(command: CDVInvokedUrlCommand) {
         guard let apiKey = command.argument(at: 0) as? String,
               let endPoint = command.argument(at: 1) as? String,
-              let applicationId = command.argument(at: 2) as? NSNumber else {
-            let pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR,
-                messageAs: "apiKey, endPoint and applicationId are required")
+             let pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR,
+                messageAs: "apiKey, endPoint are required")
             self.commandDelegate!.send(pluginResult, callbackId: command.callbackId)
             return
         }
@@ -65,7 +64,6 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
             if let token = token {
                 self.token = token
                 self.launchTruIDSDK(token: token, endPoint: endPoint,
-                    applicationId: applicationId.intValue)
             } else {
                 self.sendFailure(sessionId: nil, statusCode: "2016",
                     message: "Failed to generate token")
@@ -73,7 +71,11 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
         }
     }
 
+<<<<<<< HEAD
     private func launchTruIDSDK(token: String, endPoint: String, applicationId: Int) {
+=======
+    private func launchTruIDSDK(token: String, endPoint: String, command: CDVInvokedUrlCommand) {
+>>>>>>> 9916edb (application id is removed from the plugin)
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }

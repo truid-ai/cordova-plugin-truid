@@ -1,8 +1,7 @@
 export interface LaunchOptions {
     apiKey: string;
     endPoint: string;
-    applicationId: number;
-}
+ }
 
 export interface LaunchResult {
     success?: boolean;

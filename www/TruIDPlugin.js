@@ -6,8 +6,7 @@ var TruIDPlugin = {
      * @param {Object} options - Configuration options
      * @param {string} options.apiKey - API key for authentication
      * @param {string} options.endPoint - Backend endpoint URL
-     * @param {number} options.applicationId - Application ID
-     * @returns {Promise<Object>} - Promise resolving to {sessionId, verificationStatus, error}
+      * @returns {Promise<Object>} - Promise resolving to {sessionId, verificationStatus, error}
      */
     launchSDK: function(options) {
         options = options || {};
@@ -21,7 +20,7 @@ var TruIDPlugin = {
                 },
                 'TruIDPlugin',
                 'launchSDK',
-                [options.apiKey, options.endPoint, options.applicationId]
+                [options.apiKey, options.endPoint]
             );
         });
     }

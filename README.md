@@ -18,7 +18,7 @@ targets.
 ## 1. What you get
 
 The plugin wraps the native truID SDK behind a single call. On Android you
-invoke `launchSDK(apiKey, endPoint, applicationId)` via `cordova.exec`; on iOS
+invoke `launchSDK(apiKey, endPoint)` via `cordova.exec`; on iOS
 the verification UI is presented directly from Swift/SwiftUI. Either way, the
 SDK runs the verification flow (document capture, face liveness, ID-to-selfie,
 fingerprint, etc.) in its own screen and returns a result with a **status
@@ -166,14 +166,14 @@ export class HomePage {
       (err: any) => this.zone.run(() => { this.result = { error: err, isError: true }; }),
       'TruIDPlugin',
       'launchSDK',
-      ['<YOUR_API_KEY>', 'https://<your-truid-endpoint>', <YOUR_APPLICATION_ID>]
+      ['<YOUR_API_KEY>', 'https://<your-truid-endpoint>']
     );
   }
 }
 ```
 
 > Fetch the API key / session token from **your backend** in production — do not
-> ship a production key in the app bundle. A wrong `applicationId`/endpoint makes
+> ship a production key in the app bundle. A wrong configuration in homepage makes
 > the truID server return a `"Configuration Error"`.
 
 ### Result object fields

@@ -24,8 +24,7 @@ export class VerificationPage {
       const options: LaunchOptions = {
         apiKey: environment.truid.apiKey, // Fetch from backend in production, never hardcode
         endPoint: environment.truid.endPoint,
-        applicationId: environment.truid.applicationId
-      };
+       };
 
       this.result = await TruIDPlugin.launchSDK(options);
 

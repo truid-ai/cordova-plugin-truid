@@ -40,10 +40,9 @@ public class TruIDPlugin extends CordovaPlugin {
     private void launchSDK(JSONArray args, CallbackContext callback) throws JSONException {
         final String appToken = args.optString(0, "");
         final String endPoint = args.optString(1, "");
-        final int applicationId = args.optInt(2, -1);
-
-        if (appToken.isEmpty() || endPoint.isEmpty() || applicationId < 0) {
-            callback.error("apiKey, endPoint and applicationId are required");
+ 
+        if (appToken.isEmpty() || endPoint.isEmpty()) {
+            callback.error("apiKey and endPoint are required");
             return;
         }
 
@@ -54,7 +53,7 @@ public class TruIDPlugin extends CordovaPlugin {
             try {
                 String token = generateToken(appToken, endPoint);
                 if (token != null && !token.isEmpty()) {
-                    launchTruIDSDK(token, endPoint, applicationId);
+                    launchTruIDSDK(token, endPoint);
                 } else {
                     fail("Failed to generate token");
                 }
@@ -64,7 +63,7 @@ public class TruIDPlugin extends CordovaPlugin {
         });
     }
 
-    private void launchTruIDSDK(final String token, final String endPoint, final int applicationId) {
+    private void launchTruIDSDK(final String token, final String endPoint) {
         final Activity activity = cordova.getActivity();
         activity.runOnUiThread(() -> {
             try {
@@ -96,7 +95,7 @@ public class TruIDPlugin extends CordovaPlugin {
                     false, // enableReportScreen
                     false, // disableLocationCapture
                     false, // displayFingerprintHelpPopup
-                    applicationId,
+                    null,
                     ""     // accountType (SDK requires non-null; empty means none)
                 );
 
