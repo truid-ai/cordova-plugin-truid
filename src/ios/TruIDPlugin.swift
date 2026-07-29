@@ -8,6 +8,7 @@ import Alamofire
     private var token: String?
     private var session: TruID.SessionResult?
     private var error: String?
+    private var statusCode: Int?
 
     @objc(launchSDK:)
     func launchSDK(command: CDVInvokedUrlCommand) {
@@ -59,13 +60,15 @@ import Alamofire
                 enableReportScreen: true,
                 isTestAccount: false,
                 themeColor: .blue,
-                success: { sessionResult in
+                success: { sessionResult, statusCode in
                     self.session = sessionResult
                     self.token = nil
+                    self.statusCode = statusCode
 
                     let resultDict: [String: Any] = [
                         "success": true,
                         "sessionId": sessionResult.id ?? ""
+                        "statusCode": self.statusCode ?? -1
                     ]
 
                     let pluginResult = CDVPluginResult(status: CDVCommandStatus_OK,
@@ -74,9 +77,10 @@ import Alamofire
 
                     self.viewController?.dismiss(animated: true)
                 },
-                failure: { sessionId, error in
+                failure: { sessionId, error, statusCode in
                     self.token = nil
                     self.error = error.message
+                    self.statusCode = statusCode
 
                     let pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR,
                         messageAs: "TruID verification failed: \(error.message)")

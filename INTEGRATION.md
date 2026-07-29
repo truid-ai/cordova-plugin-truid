@@ -42,7 +42,7 @@ cordova plugin add ../cordova-plugin-truid
 The plugin automatically brings with it:
 
 - the JS bridge (`cordova.plugins.TruIDPlugin`),
-- the Android SDK dependency (`com.github.truid-ai:android-sdk:8.0.2` from public JitPack) and required Android permissions,
+- the Android SDK dependency (`com.github.truid-ai:android-sdk:8.0.6` from public JitPack) and required Android permissions,
 - iOS `Info.plist` usage descriptions (override the texts with `--variable CAMERA_USAGE_DESCRIPTION="..."` etc. at install time),
 - a build hook that makes cordova-android 10's generated projects compatible with AGP 8 (injects the required `namespace` into `CordovaLib` and the app module — no action needed on your side).
 
@@ -70,6 +70,45 @@ cordova run android --device
 ```
 
 > If your app already targets different SDK/Gradle versions, the values above are the minimums the TruID SDK needs — raising yours is fine, lowering is not.
+
+### 3.1 16 KB page-size alignment (Android 15+) — automatic
+
+Google Play requires 64-bit native libraries to be 16 KB-aligned for apps
+targeting Android 15+. **You do not need to configure anything.**
+
+The TruID SDK's own native libraries are already 16 KB-aligned. The only
+4 KB-laid-out libraries in a built APK come from two third-party transitive
+dependencies, and the plugin raises them automatically:
+
+| Dependency | Raised to |
+|---|---|
+| `androidx.camera:*` | `1.4.2` |
+| `org.tensorflow:tensorflow-lite` | `com.google.ai.edge.litert:litert:2.1.6` |
+
+This activates only when your build can take it — **AGP 8.5+ and compileSdk
+35+**, which the versions in §3 satisfy. On older toolchains it is a no-op and
+your CameraX/TFLite versions are left untouched. Both nudges are **raise-only**:
+if your app is already on a newer CameraX or lottie, the plugin will not pull it
+back. Every build prints its decision:
+
+```
+truID: 16 KB-aligned native deps ENABLED (CameraX 1.4.2, litert 2.1.6) (AGP 8.6.1, compileSdk 35, mode=auto)
+```
+
+Pin the behaviour explicitly with `-Ptruid16kb=on` or `-Ptruid16kb=off`.
+
+> **Verify one capture flow on a device after your first build.** `litert` is
+> TFLite's renamed successor and ships its native library as `libLiteRt.so`
+> instead of `libtensorflowlite_jni.so`. The Java API (`org.tensorflow.lite.*`)
+> is unchanged, but if you hit an `UnsatisfiedLinkError` during document
+> capture, build with `-Ptruid16kb=off` and report it.
+
+> Do **not** try to fix alignment by rewriting `p_align` in the `.so` files with
+> a Gradle hook — a widely-copied snippet does exactly this. A `PT_LOAD` segment
+> must satisfy `p_offset ≡ p_vaddr (mod p_align)`, so raising `p_align` without
+> relaying out the segments yields a malformed ELF: the audit tools report a
+> false PASS while the loader still maps 4 KB offsets, and a loader that
+> validates `p_align` can refuse to load the library outright.
 
 ---
 
@@ -169,7 +208,7 @@ A complete reference page (button, spinner, success/error cards) is in [`example
 | Component | Version |
 |---|---|
 | cordova-plugin-truid | 1.1.0 |
-| TruID Android SDK | `com.github.truid-ai:android-sdk:8.0.2` |
+| TruID Android SDK | `com.github.truid-ai:android-sdk:8.0.6` |
 | TruID iOS package | `truid-ai/TruIDPackage` 1.8.1 |
 | Host app | Ionic 4.11 / Angular 8.1 / Cordova CLI 10 / cordova-android 10.1.2 / cordova-ios 6.x |
 

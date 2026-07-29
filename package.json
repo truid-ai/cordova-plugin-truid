@@ -1,6 +1,6 @@
 {
   "name": "cordova-plugin-truid",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Cordova plugin integrating the native TruID identity-verification SDK (Android & iOS) for Ionic/Cordova apps",
   "cordova": {
     "id": "cordova-plugin-truid",

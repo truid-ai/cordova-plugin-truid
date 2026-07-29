@@ -4,20 +4,184 @@
 // NOTE: module namespaces (an AGP 8 requirement) are NOT set here because
 // they differ per host app - the plugin's hooks/android-agp8-namespace.js
 // injects them into the generated build files instead.
+//
+// Design rule for everything below: this file is merged into SOMEONE ELSE'S
+// app build, so it must never downgrade a host that is already ahead. Version
+// nudges are raise-only (eachDependency), not hard `force` pins.
 
 repositories {
-    google()
+    google()          // also serves com.google.ai.edge.litert (16 KB-aligned TFLite)
     mavenCentral()
     maven { url "https://jitpack.io" }
 }
 
 dependencies {
-    implementation "com.github.truid-ai:android-sdk:8.0.2"
+    implementation "com.github.truid-ai:android-sdk:8.0.6"
+    // TruIDPlugin.java references AuthenticateWithTruID, which extends androidx
+    // activity's ActivityResultContract. The SDK scopes androidx.activity as
+    // `implementation`, so it is not on the plugin's compile classpath by
+    // default -> "cannot access ActivityResultContract". Add it explicitly.
+    implementation "androidx.activity:activity:1.8.2"
+    implementation "androidx.activity:activity-ktx:1.8.2"
+}
+
+// ---------------------------------------------------------------------------
+// 16 KB page-size alignment (Android 15+ / Google Play requirement)
+//
+// The TruID SDK's own natives are already 16 KB-aligned (built with
+// -Wl,-z,max-page-size=16384). Measured across a built APK, the only
+// 4 KB-laid-out 64-bit libraries come from two third-party transitive deps:
+//   libimage_processing_util_jni.so  <- androidx.camera:camera-core   1.3.x
+//   libtensorflowlite_jni.so         <- org.tensorflow:tensorflow-lite 2.16.x
+//
+// Alignment CANNOT be patched into a prebuilt .so after the fact. A PT_LOAD
+// must satisfy p_offset == p_vaddr (mod p_align), so rewriting p_align to
+// 16384 in place without relaying out the segments produces a MALFORMED ELF:
+// the audit tools report a false PASS while the loader still maps 4 KB
+// offsets, and a loader that validates p_align can refuse to dlopen it. The
+// only real fix is to consume upstream builds that are genuinely relaid out:
+//   androidx.camera 1.4.2                    -> aligned and congruent
+//   com.google.ai.edge.litert:litert 2.1.6   -> aligned, keeps the
+//                                               org.tensorflow.lite.* classes
+//
+// Do NOT "just bump" tensorflow-lite: org.tensorflow:tensorflow-lite:2.17.0 is
+// a relocation stub whose .jar is a 4 KB copy of the POM with NO native libs.
+// Forcing it silently drops libtensorflowlite_jni.so -> UnsatisfiedLinkError.
+//
+// Gated on AGP 8.5+ (which zipaligns the APK's uncompressed .so with -P 16)
+// and compileSdk 35+, i.e. the toolchain in INTEGRATION.md section 3. On older
+// hosts this is a no-op and CameraX/TFLite are left exactly as the host
+// resolves them. Override with -Ptruid16kb=on|off (default: auto).
+//
+// The decision is evaluated LAZILY, at dependency-resolution time: Cordova
+// applies this file long before the generated app/build.gradle sets
+// compileSdkVersion, so an apply-time read sees 0 and would silently disable
+// the swap on every host.
+// ---------------------------------------------------------------------------
+ext.truid16kbDecision = null
+
+def truidDecide16kb = {
+    if (project.ext.truid16kbDecision != null) return project.ext.truid16kbDecision
+
+    // An `apply from:` script's own classloader does NOT see the root
+    // buildscript classpath, so Class.forName(..) alone never finds AGP. Load
+    // through the android extension's classloader, which comes from AGP itself.
+    def agpLoaders = []
+    try { agpLoaders << android.getClass().getClassLoader() } catch (Throwable ignored) { }
+    agpLoaders << getClass().getClassLoader()
+    def agp = ['com.android.Version',
+               'com.android.builder.model.Version'].findResult { cls ->
+        agpLoaders.findResult { loader ->
+            try {
+                Class.forName(cls, false, loader)
+                        .getField('ANDROID_GRADLE_PLUGIN_VERSION').get(null).toString()
+            } catch (Throwable ignored) {
+                null
+            }
+        }
+    }
+
+    int agpMajor = 0, agpMinor = 0
+    if (agp) {
+        def m = (agp =~ /^(\d+)\.(\d+)/)
+        if (m.find()) {
+            agpMajor = m.group(1) as int
+            agpMinor = m.group(2) as int
+        }
+    }
+
+    int compileSdk = 0
+    try {
+        def v = android.compileSdk
+        if (v) compileSdk = v as int
+    } catch (Throwable ignored) { }
+    if (compileSdk == 0) {
+        try {
+            def m = (android.compileSdkVersion.toString() =~ /(\d+)/)
+            if (m.find()) compileSdk = m.group(1) as int
+        } catch (Throwable ignored) { }
+    }
+
+    def hostOk = (agpMajor > 8 || (agpMajor == 8 && agpMinor >= 5)) && compileSdk >= 35
+    def mode = (project.findProperty('truid16kb') ?: 'auto').toString().toLowerCase()
+    def use = (mode == 'on') || (mode != 'off' && hostOk)
+
+    project.ext.truid16kbDecision = [use: use]
+    println("truID: 16 KB-aligned native deps " +
+            "${use ? 'ENABLED (CameraX 1.4.2, litert 2.1.6)' : 'disabled'} " +
+            "(AGP ${agp ?: 'unknown'}, compileSdk ${compileSdk}, mode=${mode})")
+    if (use && !hostOk) {
+        // litert 2.x publishes Kotlin-Multiplatform module metadata. Gradle < 7
+        // cannot serialize the resulting resolution result and fails with
+        // "Corrupt serialized resolution result ... desktopRuntimeElements-published
+        // -> androidx.lifecycle:lifecycle-runtime-ktx", which looks nothing like
+        // the real cause. Warn rather than let someone hunt that down.
+        println("truID: WARNING -Ptruid16kb=on was forced on an unsupported host " +
+                "(needs AGP 8.5+ and compileSdk 35+). Expect resolution failures; " +
+                "on Gradle 6.x litert's module metadata breaks dependency resolution outright.")
+    }
+    return project.ext.truid16kbDecision
+}
+
+def truidMajorOf = { String v ->
+    def m = (v =~ /^(\d+)/)
+    m.find() ? (m.group(1) as int) : 0
+}
+
+def truidCameraArtifacts = ['camera-core', 'camera-camera2', 'camera-lifecycle',
+                            'camera-view', 'camera-video']
+
+configurations.all {
+    resolutionStrategy {
+        eachDependency { details ->
+            def req = details.requested
+
+            // TruID SDK 8.0.5+ calls the lottie-compose 6.x LottieAnimation
+            // overload; an older transitive 5.x gives NoSuchMethodError at
+            // runtime. Raise-only, so a host already on 6.x/7.x is untouched.
+            if (req.group == 'com.airbnb.android'
+                    && (req.name == 'lottie' || req.name == 'lottie-compose')) {
+                if (truidMajorOf(req.version) in 1..5) {
+                    details.useVersion('6.0.0')
+                    details.because('truID SDK 8.0.5+ needs the lottie-compose 6.x LottieAnimation overload')
+                }
+                return
+            }
+
+            if (!truidDecide16kb().use) return
+
+            if (req.group == 'androidx.camera' && truidCameraArtifacts.contains(req.name)) {
+                // Raise-only: never pull a host back from a newer CameraX.
+                def m = (req.version =~ /^(\d+)\.(\d+)/)
+                def older = true
+                if (m.find()) {
+                    int maj = m.group(1) as int
+                    int min = m.group(2) as int
+                    older = (maj < 1) || (maj == 1 && min < 4)
+                }
+                if (older) {
+                    details.useVersion('1.4.2')
+                    details.because('truID: CameraX 1.4.2 ships 16 KB-aligned natives')
+                }
+            } else if (req.group == 'org.tensorflow' && req.name == 'tensorflow-lite') {
+                details.useTarget('com.google.ai.edge.litert:litert:2.1.6')
+                details.because('truID: 16 KB-aligned TFLite; tensorflow-lite 2.17.0 is a stub with no .so')
+            }
+        }
+    }
 }
 
 android {
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
+    }
+    // The SDK embeds OpenCV natives and also pulls quickbirdstudios:opencv
+    // transitively; both ship the same .so. Keep one copy instead of failing
+    // the merge. (`packagingOptions` is the spelling that works on AGP 7 & 8.)
+    packagingOptions {
+        pickFirst 'lib/**/libc++_shared.so'
+        pickFirst 'lib/**/libopencv_java4.so'
+        pickFirst 'lib/**/libopencv_info.so'
     }
 }
