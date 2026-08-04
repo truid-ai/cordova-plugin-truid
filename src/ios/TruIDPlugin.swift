@@ -98,11 +98,11 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
                 enableReportScreen: true,
                 isTestAccount: false,
                 themeColor: .blue,
-                success: { [weak self] sessionResult, statusCode in
+                success: { [weak self] sessionResult, statusCode, truidResults in
                     guard let self = self else { return }
                     self.session = sessionResult
                     self.token = nil
-                    self.sendSuccess(sessionResult: sessionResult, statusCode: statusCode)
+                    self.sendSuccess(sessionResult: sessionResult, statusCode: statusCode, truidResults: truidResults)
                     self.dismissSDK()
                 },
                 failure: { [weak self] sessionId, error, statusCode in
@@ -134,12 +134,13 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
     /// Match the Android payload exactly: sessionId, verificationStatus,
     /// statusCode and error are always present so the JS layer can render a
     /// status without platform-specific branching.
-  private func sendSuccess(sessionResult: TruID.SessionResult, statusCode: Int) {
+  private func sendSuccess(sessionResult: TruID.SessionResult, statusCode: Int, truidResults: [FingerprintResult]) {
         let resultDict: [String: Any] = [
             "success": true,
             "sessionId": sessionResult.id ,
             "verificationStatus": statusCode,
             "statusCode": statusCode,
+            "truidResults": truidResults
             "error": ""
         ]
         self.send(CDVPluginResult(status: CDVCommandStatus_OK, messageAs: resultDict))
