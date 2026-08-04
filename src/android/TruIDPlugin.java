@@ -11,15 +11,22 @@ import org.json.JSONObject;
 
 import com.truid.android.TruID;
 import com.truid.android.AuthenticateWithTruID;
+import com.truid.android.TruIDFingerprintResult;
 import com.truid.android.vision.FingerprintOptions;
 import com.truid.android.vision.FingersToScan;
 
+import android.util.Base64;
+
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 
 public class TruIDPlugin extends CordovaPlugin {
 
@@ -32,6 +39,10 @@ public class TruIDPlugin extends CordovaPlugin {
     public boolean execute(String action, JSONArray args, CallbackContext callback) throws JSONException {
         if (action.equals("launchSDK")) {
             this.launchSDK(args, callback);
+            return true;
+        }
+        if (action.equals("readFingerprintFile")) {
+            this.readFingerprintFile(args, callback);
             return true;
         }
         return false;
@@ -95,8 +106,7 @@ public class TruIDPlugin extends CordovaPlugin {
                     false, // enableReportScreen
                     false, // disableLocationCapture
                     false, // displayFingerprintHelpPopup
-                    null,
-                    ""     // accountType (SDK requires non-null; empty means none)
+                    false  // shouldShowStartScreen
                 );
 
                 // CordovaActivity is not an AndroidX ComponentActivity, so
@@ -132,6 +142,13 @@ public class TruIDPlugin extends CordovaPlugin {
             } else {
                 ret.put("statusCode", result.getStatusCode() == null ? "" : result.getStatusCode());
             }
+
+            // Fingerprint capture results. The SDK writes each finger to the app cache
+            // and returns paths, so only the paths cross the bridge - reading the image
+            // bytes is a separate, explicit readFingerprintFile() call.
+            ret.put("hasFingerprints", result.getHasWSQ());
+            ret.put("fingerprints", fingerprintsToJson(result.getFingerprints()));
+
             callbackContext.success(ret);
         } catch (Exception e) {
             callbackContext.error("Error processing result: " + e.getMessage());
@@ -144,6 +161,75 @@ public class TruIDPlugin extends CordovaPlugin {
             callbackContext.error(message);
             callbackContext = null;
         }
+    }
+
+    /**
+     * One JSON object per captured finger. fingerIndex is the ANSI/NIST number, fixed per
+     * finger: 1 right thumb, 2..5 right index to pinky, 6 left thumb, 7..10 left index to
+     * pinky. imagePath is a PNG, wsqPath the WSQ template for the same finger.
+     */
+    private JSONArray fingerprintsToJson(List<TruIDFingerprintResult> fingerprints) throws JSONException {
+        JSONArray array = new JSONArray();
+        if (fingerprints == null) {
+            return array;
+        }
+        for (TruIDFingerprintResult fingerprint : fingerprints) {
+            JSONObject item = new JSONObject();
+            item.put("fingerIndex", fingerprint.getFingerIndex());
+            item.put("fingerName", fingerprint.getFingerName());
+            item.put("imagePath", fingerprint.getImagePath());
+            item.put("wsqPath", fingerprint.getWsqPath());
+            item.put("imageSize", new File(fingerprint.getImagePath()).length());
+            item.put("wsqSize", new File(fingerprint.getWsqPath()).length());
+            array.put(item);
+        }
+        return array;
+    }
+
+    /**
+     * Reads one of the files reported in the fingerprints array and returns it base64
+     * encoded, so the WebView can show the image or upload the WSQ. Runs off the WebView
+     * thread because a full hand is several megabytes.
+     */
+    private void readFingerprintFile(JSONArray args, CallbackContext callback) {
+        final String path = args.optString(0, "");
+        if (path.isEmpty()) {
+            callback.error("path is required");
+            return;
+        }
+
+        cordova.getThreadPool().execute(() -> {
+            try {
+                File file = new File(path);
+                // Only the SDK's own capture files may be read this way.
+                String canonical = file.getCanonicalPath();
+                String cacheRoot = cordova.getActivity().getCacheDir().getCanonicalPath();
+                if (!canonical.startsWith(cacheRoot)) {
+                    callback.error("path is outside the app cache directory");
+                    return;
+                }
+                if (!file.exists()) {
+                    callback.error("file no longer exists: " + path);
+                    return;
+                }
+
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                FileInputStream input = new FileInputStream(file);
+                try {
+                    byte[] chunk = new byte[8192];
+                    int read;
+                    while ((read = input.read(chunk)) != -1) {
+                        buffer.write(chunk, 0, read);
+                    }
+                } finally {
+                    input.close();
+                }
+
+                callback.success(Base64.encodeToString(buffer.toByteArray(), Base64.NO_WRAP));
+            } catch (Exception e) {
+                callback.error("Could not read " + path + ": " + e.getMessage());
+            }
+        });
     }
 
     private String generateToken(String apiKey, String endPoint) throws Exception {

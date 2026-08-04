@@ -16,7 +16,11 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.truid-ai:android-sdk:8.0.6"
+    // 8.0.8-beta adds the fingerprint capture results to the activity result
+    // (AuthenticateWithTruID.Output.getFingerprints()). Unlike 8.0.6-beta it still
+    // declares androidx.camera 1.3.4, so it also builds on the AGP 4.0.0 /
+    // cordova-android 9.1.0 host described in section 2 of the README.
+    implementation "com.github.truid-ai:android-sdk:8.0.8-beta"
     // TruIDPlugin.java references AuthenticateWithTruID, which extends androidx
     // activity's ActivityResultContract. The SDK scopes androidx.activity as
     // `implementation`, so it is not on the plugin's compile classpath by

@@ -26,6 +26,10 @@ code**, verification status, session id, and error — see [§ truID SDK status
 codes](#truid-sdk-status-codes) at the end of this guide, which applies to
 both platforms.
 
+On Android the result also carries the **captured fingerprints** (image + WSQ
+template per finger) when the fingerprint step ran — see
+[§6](#6-fingerprint-data-android).
+
 ---
 
 # Android Integration
@@ -44,7 +48,7 @@ Cordova/AGP/JDK changes the requirements substantially.
 | JDK | **8** |
 | Gradle | **6.5** (AGP 4.0.0 does not work on Gradle 7.x) |
 | Android Gradle Plugin | **4.0.0** (shipped by cordova-android 9.1.0) |
-| truID Android SDK | **8.0.6** (pulled from JitPack by the plugin) |
+| truID Android SDK | **8.0.8-beta** (pulled from JitPack by the plugin) |
 
 **Android SDK components required on the build machine:**
 - **Platform API 31** installed (compileSdk 31).
@@ -56,17 +60,27 @@ Cordova/AGP/JDK changes the requirements substantially.
 
 ## 3. Install the plugin
 
+Each truID SDK version has its own branch of this repo, so install the branch that
+matches the SDK you want. This guide documents **`sdk-v8.0.8-beta`** (truID Android
+SDK 8.0.8-beta), the first version that returns fingerprint capture data — see
+[§6](#6-fingerprint-data-android).
+
+| Plugin branch | truID Android SDK | Fingerprint data in the result |
+|---|---|---|
+| `sdk-v8.0.8-beta` | 8.0.8-beta | yes |
+| `sdk-v8.0.6` | 8.0.6 | no |
+
 From your project root:
 
 ```bash
-cordova plugin add https://github.com/truid-ai/cordova-plugin-truid
+cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.0.8-beta
 # or from a local copy:
 cordova plugin add ../cordova-plugin-truid
 ```
 
 The plugin automatically brings:
 - the JavaScript bridge (`cordova.plugins.TruIDPlugin` / `cordova.exec`),
-- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.6`, from JitPack),
+- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.8-beta`, from JitPack),
 - the **dependency-version alignment** the SDK needs (compose, material, camera,
   lottie, okhttp, coroutines, etc.) so it builds under AGP 4.0.0,
 - the required Android permissions (Camera, Internet, Location).
@@ -78,7 +92,7 @@ The plugin automatically brings:
 Because cordova-android 9.1.0 predates the SDK's modern dependencies, a few
 settings must be applied to the generated `platforms/android`. The plugin handles
 the *dependency* side automatically; you must apply the following **project-level**
-settings. (See §6 for a script that automates all of this.)
+settings. (See §7 for a script that automates all of this.)
 
 ### 4.1 `config.xml` — inside `<platform name="android">`
 ```xml
@@ -166,10 +180,115 @@ export class HomePage {
 | `verificationStatus` | textual status from the SDK |
 | `statusCode` | numeric status code (see [truID SDK status codes](#truid-sdk-status-codes)) |
 | `error` | error message (empty when none) |
+| `hasFingerprints` | `true` when the session captured fingerprints |
+| `fingerprints` | array of captured fingers, see [§6](#6-fingerprint-data-android) |
 
 ---
 
-## 6. One-command build (optional helper)
+## 6. Fingerprint data (Android)
+
+Requires truID Android SDK **8.0.8-beta** or newer. When the session ran the
+fingerprint capture step, the result carries one entry per captured finger.
+
+The SDK writes each finger to the **app cache directory** and returns only the
+paths — a full hand is several megabytes, far more than an activity result or the
+Cordova bridge should carry in one message. Reading the bytes is a separate,
+explicit call.
+
+### Fingerprint entry fields
+| Field | Description |
+|---|---|
+| `fingerIndex` | ANSI/NIST finger number, fixed per finger and independent of capture order: `1` right thumb, `2`–`5` right index/middle/ring/pinky, `6` left thumb, `7`–`10` left index/middle/ring/pinky |
+| `fingerName` | same value as a label, e.g. `"right_index"`, `"left_thumb"` |
+| `imagePath` | absolute path of the finger image, PNG encoded |
+| `wsqPath` | absolute path of the WSQ template for that finger |
+| `imageSize` | size of the PNG in bytes |
+| `wsqSize` | size of the WSQ in bytes |
+
+```json
+{
+  "sessionId": "6f0c...",
+  "verificationStatus": true,
+  "statusCode": "2000",
+  "error": "",
+  "hasFingerprints": true,
+  "fingerprints": [
+    {
+      "fingerIndex": 2,
+      "fingerName": "right_index",
+      "imagePath": "/data/user/0/<your.app.id>/cache/truIDFingerCapture/finger_2_9C1F....png",
+      "wsqPath": "/data/user/0/<your.app.id>/cache/truIDFingerCapture/finger_2_5B7A....wsq",
+      "imageSize": 264518,
+      "wsqSize": 38124
+    }
+  ]
+}
+```
+
+### Reading the files
+
+The WebView cannot load `file://` paths out of the app cache directory, so use
+`readFingerprintFile(path)`. It returns the file **base64 encoded**, works for
+both `imagePath` and `wsqPath`, and refuses any path outside the app cache.
+
+```ts
+import { Component, NgZone } from '@angular/core';
+
+@Component({ selector: 'app-home', templateUrl: 'home.page.html' })
+export class HomePage {
+  fingerprints: any[] = [];
+
+  constructor(private zone: NgZone) {}
+
+  launchTruid(): void {
+    const truid = (window as any).cordova.plugins.TruIDPlugin;
+
+    truid.launchSDK({ apiKey: '<YOUR_API_KEY>', endPoint: 'https://<your-truid-endpoint>' })
+      .then((res: any) => {
+        if (!res.hasFingerprints) { return; }
+
+        // Sorting by fingerIndex gives a stable right-thumb-to-left-pinky order.
+        const fingers = res.fingerprints.sort((a, b) => a.fingerIndex - b.fingerIndex);
+
+        return Promise.all(
+          fingers.map((finger: any) =>
+            truid.readFingerprintFile(finger.imagePath).then((base64: string) => ({
+              index: finger.fingerIndex,
+              name: finger.fingerName,
+              wsqPath: finger.wsqPath,
+              src: 'data:image/png;base64,' + base64
+            }))
+          )
+        ).then((loaded: any[]) => this.zone.run(() => { this.fingerprints = loaded; }));
+      })
+      .catch((err: any) => console.error('truID failed', err));
+  }
+}
+```
+
+```html
+<div *ngFor="let finger of fingerprints">
+  <p>{{ finger.index }}. {{ finger.name }}</p>
+  <img [src]="finger.src" width="150" />
+</div>
+```
+
+Two things to keep in mind:
+
+- **Read the files while the result is fresh.** They live in the cache directory,
+  so Android may delete them under storage pressure, and the SDK clears its own
+  capture files when the next session starts. Upload or copy anything you need to
+  keep (`cordova-plugin-file` can move them to persistent storage).
+- **Load the WSQ only when you actually need it.** `wsqPath` is the biometric
+  template for matching or for sending to a backend; it is not an image the
+  WebView can display. Decoding WSQ requires a WSQ decoder, not `<img>`.
+
+The iOS side of the plugin does not report fingerprints yet: `fingerprints` comes
+back as an empty array there.
+
+---
+
+## 7. One-command build (optional helper)
 
 Because several §4 settings are reset by `cordova prepare`, teams usually wrap the
 whole thing in a script that: builds the web bundle (Node 14) → `cordova prepare`
@@ -186,7 +305,7 @@ automatically, the iOS side of `cordova-plugin-truid` still requires you to
 add truID's native Swift package to the generated Xcode project yourself. The
 steps below cover that end-to-end.
 
-## 7. Install the plugin
+## 8. Install the plugin
 
 From your project root, same command as Android — the plugin ships hooks for
 both platforms from the one package:
@@ -196,7 +315,7 @@ cordova plugin add https://github.com/truid-ai/cordova-plugin-truid
 cordova plugin add ../cordova-plugin-truid
 ```
 
-## 8. Add the iOS platform and prepare it
+## 9. Add the iOS platform and prepare it
 
 If you haven't already added iOS as a target platform, do that first, then run
 `prepare` to generate/refresh the `platforms/ios` Xcode project:
@@ -208,7 +327,7 @@ This regenerates `platforms/ios/<YourApp>.xcworkspace` — open that workspace
 (not the `.xcodeproj`) in Xcode for the remaining steps, since Cordova iOS
 projects rely on CocoaPods/workspace structure for some plugins.
 
-## 9. Set the minimum deployment target
+## 10. Set the minimum deployment target
 
 In Xcode:
 1. Select your project (top of the File Navigator).
@@ -219,7 +338,7 @@ truID's iOS SDK relies on newer AVFoundation/Vision APIs for liveness and
 document capture, so builds targeting earlier than iOS 15.1 will fail to
 compile or link.
 
-## 10. Add the Swift Package dependencies
+## 11. Add the Swift Package dependencies
 
 Add these two packages to your app target via **File → Add Package
 Dependencies…**:
@@ -250,7 +369,7 @@ Steps in Xcode:
 5. Make sure the target checkbox next to your app is selected before clicking
    **Add Package**.
 
-## 11. Add required Info.plist permissions
+## 12. Add required Info.plist permissions
 
 The verification flow needs camera (and typically location) access, the same
 as on Android. In `platforms/ios/<YourApp>/<YourApp>-Info.plist`, add (or
@@ -264,14 +383,14 @@ prompt:
 <string>Location is used as part of identity verification.</string>
 ```
 
-## 12. Build the app in Xcode
+## 13. Build the app in Xcode
 
 With the workspace open, select a physical device or simulator and build
 (<kbd>⌘B</kbd>) or run (<kbd>⌘R</kbd>). The first build after adding the
 packages may take a while as Xcode resolves and compiles the SPM
 dependencies.
 
-## 13. Swift version troubleshooting
+## 14. Swift version troubleshooting
 
 If your project's default Swift toolchain is **Swift 6.x**, the build may
 fail with compiler errors coming from the truID/Alamofire package sources
@@ -288,7 +407,7 @@ doesn't require downgrading Xcode itself.
 
 ---
 
-## 14. truID SDK status codes
+## 15. truID SDK status codes
 
 The `statusCode` returned in the result object.
 
