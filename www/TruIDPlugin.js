@@ -8,8 +8,8 @@ var TruIDPlugin = {
      * @param {string} options.endPoint - Backend endpoint URL
       * @returns {Promise<Object>} - Promise resolving to {sessionId, verificationStatus,
       *   statusCode, error, hasFingerprints, fingerprints}. Each fingerprints entry is
-      *   {fingerIndex, fingerName, imagePath, wsqPath, imageSize, wsqSize}; read the file
-      *   contents with readFingerprintFile().
+      *   {fingerIndex, fingerName, imageBase64, wsqPath, wsqSize}: imageBase64 is the PNG
+      *   inline, the WSQ template is fetched with readFingerprintFile(wsqPath).
      */
     launchSDK: function(options) {
         options = options || {};
@@ -29,8 +29,9 @@ var TruIDPlugin = {
     },
 
     /**
-     * Read one of the fingerprint files reported by launchSDK (Android only).
-     * @param {string} path - imagePath or wsqPath taken from a fingerprints entry
+     * Read the WSQ template of a captured finger (Android only). Finger images need no call,
+     * they arrive inline as imageBase64.
+     * @param {string} path - wsqPath taken from a fingerprints entry
      * @returns {Promise<string>} - Promise resolving to the file contents, base64 encoded
      */
     readFingerprintFile: function(path) {

@@ -143,9 +143,10 @@ public class TruIDPlugin extends CordovaPlugin {
                 ret.put("statusCode", result.getStatusCode() == null ? "" : result.getStatusCode());
             }
 
-            // Fingerprint capture results. The SDK writes each finger to the app cache
-            // and returns paths, so only the paths cross the bridge - reading the image
-            // bytes is a separate, explicit readFingerprintFile() call.
+            // Fingerprint capture results. Each finger image rides along as base64, ready
+            // to render. The WSQ template stays a file in the app cache and is fetched on
+            // demand with readFingerprintFile(), because it is the bigger of the two and
+            // most apps only upload it.
             ret.put("hasFingerprints", result.getHasWSQ());
             ret.put("fingerprints", fingerprintsToJson(result.getFingerprints()));
 
@@ -166,7 +167,8 @@ public class TruIDPlugin extends CordovaPlugin {
     /**
      * One JSON object per captured finger. fingerIndex is the ANSI/NIST number, fixed per
      * finger: 1 right thumb, 2..5 right index to pinky, 6 left thumb, 7..10 left index to
-     * pinky. imagePath is a PNG, wsqPath the WSQ template for the same finger.
+     * pinky. imageBase64 is the PNG image inline, ready for a data URI; wsqPath is the WSQ
+     * template of the same finger, read it with readFingerprintFile().
      */
     private JSONArray fingerprintsToJson(List<TruIDFingerprintResult> fingerprints) throws JSONException {
         JSONArray array = new JSONArray();
@@ -177,9 +179,8 @@ public class TruIDPlugin extends CordovaPlugin {
             JSONObject item = new JSONObject();
             item.put("fingerIndex", fingerprint.getFingerIndex());
             item.put("fingerName", fingerprint.getFingerName());
-            item.put("imagePath", fingerprint.getImagePath());
+            item.put("imageBase64", fingerprint.getImageBase64());
             item.put("wsqPath", fingerprint.getWsqPath());
-            item.put("imageSize", new File(fingerprint.getImagePath()).length());
             item.put("wsqSize", new File(fingerprint.getWsqPath()).length());
             array.put(item);
         }
@@ -187,9 +188,9 @@ public class TruIDPlugin extends CordovaPlugin {
     }
 
     /**
-     * Reads one of the files reported in the fingerprints array and returns it base64
-     * encoded, so the WebView can show the image or upload the WSQ. Runs off the WebView
-     * thread because a full hand is several megabytes.
+     * Reads the WSQ file of a captured finger and returns it base64 encoded, so the WebView
+     * can upload or store the template. Runs off the WebView thread because a full hand is
+     * several megabytes. The finger images need no call - they arrive as imageBase64.
      */
     private void readFingerprintFile(JSONArray args, CallbackContext callback) {
         final String path = args.optString(0, "");
