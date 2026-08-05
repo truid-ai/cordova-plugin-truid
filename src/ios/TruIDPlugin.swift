@@ -41,6 +41,7 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
     func launchSDK(command: CDVInvokedUrlCommand) {
         guard let apiKey = command.argument(at: 0) as? String,
               let endPoint = command.argument(at: 1) as? String,
+            else {
              let pluginResult = CDVPluginResult(status: CDVCommandStatus_ERROR,
                 messageAs: "apiKey, endPoint are required")
             self.commandDelegate!.send(pluginResult, callbackId: command.callbackId)
@@ -63,7 +64,7 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
 
             if let token = token {
                 self.token = token
-                self.launchTruIDSDK(token: token, endPoint: endPoint,
+                self.launchTruIDSDK(token: token, endPoint: endPoint, command: command)
             } else {
                 self.sendFailure(sessionId: nil, statusCode: "2016",
                     message: "Failed to generate token")
@@ -71,11 +72,7 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
         }
     }
 
-<<<<<<< HEAD
-    private func launchTruIDSDK(token: String, endPoint: String, applicationId: Int) {
-=======
     private func launchTruIDSDK(token: String, endPoint: String, command: CDVInvokedUrlCommand) {
->>>>>>> 9916edb (application id is removed from the plugin)
 
         DispatchQueue.main.async { [weak self] in
             guard let self = self else { return }
@@ -98,11 +95,11 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
                 enableReportScreen: true,
                 isTestAccount: false,
                 themeColor: .blue,
-                success: { [weak self] sessionResult, statusCode, truidResults in
+                success: { [weak self] sessionResult, statusCode, fingerprints in
                     guard let self = self else { return }
                     self.session = sessionResult
                     self.token = nil
-                    self.sendSuccess(sessionResult: sessionResult, statusCode: statusCode, truidResults: truidResults)
+                    self.sendSuccess(sessionResult: sessionResult, statusCode: statusCode, fingerprints: fingerprints)
                     self.dismissSDK()
                 },
                 failure: { [weak self] sessionId, error, statusCode in
@@ -129,18 +126,29 @@ class TruIDHostingController<Content: View>: UIHostingController<Content>, TruID
         }
     }
 
+    private func dictionary(from result: FingerprintResult) -> [String: Any] {
+    return [
+      "fingerIndex": result.fingerIndex,
+      "imageBase64": result.imageBase64,
+      "wsqBase64": result.wsqBase64
+    ]
+  }
+
     // MARK: - Result plumbing
 
     /// Match the Android payload exactly: sessionId, verificationStatus,
     /// statusCode and error are always present so the JS layer can render a
     /// status without platform-specific branching.
-  private func sendSuccess(sessionResult: TruID.SessionResult, statusCode: Int, truidResults: [FingerprintResult]) {
+  private func sendSuccess(sessionResult: TruID.SessionResult, statusCode: Int, fingerprints: [FingerprintResult]) {
+
+    let fingerprintsJSON = fingerprints.map { dictionary(from: $0) }
+
         let resultDict: [String: Any] = [
             "success": true,
             "sessionId": sessionResult.id ,
             "verificationStatus": statusCode,
             "statusCode": statusCode,
-            "truidResults": truidResults
+            "fingerprints": fingerprintsJSON
             "error": ""
         ]
         self.send(CDVPluginResult(status: CDVCommandStatus_OK, messageAs: resultDict))
