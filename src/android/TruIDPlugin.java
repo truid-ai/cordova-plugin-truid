@@ -15,12 +15,7 @@ import com.truid.android.TruIDFingerprintResult;
 import com.truid.android.vision.FingerprintOptions;
 import com.truid.android.vision.FingersToScan;
 
-import android.util.Base64;
-
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
-import java.io.File;
-import java.io.FileInputStream;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
@@ -39,10 +34,6 @@ public class TruIDPlugin extends CordovaPlugin {
     public boolean execute(String action, JSONArray args, CallbackContext callback) throws JSONException {
         if (action.equals("launchSDK")) {
             this.launchSDK(args, callback);
-            return true;
-        }
-        if (action.equals("readFingerprintFile")) {
-            this.readFingerprintFile(args, callback);
             return true;
         }
         return false;
@@ -143,10 +134,8 @@ public class TruIDPlugin extends CordovaPlugin {
                 ret.put("statusCode", result.getStatusCode() == null ? "" : result.getStatusCode());
             }
 
-            // Fingerprint capture results. Each finger image rides along as base64, ready
-            // to render. The WSQ template stays a file in the app cache and is fetched on
-            // demand with readFingerprintFile(), because it is the bigger of the two and
-            // most apps only upload it.
+            // Fingerprint capture results. Image and WSQ template both ride along as
+            // base64, so nothing has to be read back off disk.
             ret.put("hasFingerprints", result.getHasWSQ());
             ret.put("fingerprints", fingerprintsToJson(result.getFingerprints()));
 
@@ -167,8 +156,8 @@ public class TruIDPlugin extends CordovaPlugin {
     /**
      * One JSON object per captured finger. fingerIndex is the ANSI/NIST number, fixed per
      * finger: 1 right thumb, 2..5 right index to pinky, 6 left thumb, 7..10 left index to
-     * pinky. imageBase64 is the PNG image inline, ready for a data URI; wsqPath is the WSQ
-     * template of the same finger, read it with readFingerprintFile().
+     * pinky. Both payloads are inline base64: imageBase64 is the PNG image, ready for a data
+     * URI, and wsqBase64 is the WSQ template of the same finger.
      */
     private JSONArray fingerprintsToJson(List<TruIDFingerprintResult> fingerprints) throws JSONException {
         JSONArray array = new JSONArray();
@@ -180,58 +169,12 @@ public class TruIDPlugin extends CordovaPlugin {
             item.put("fingerIndex", fingerprint.getFingerIndex());
             item.put("fingerName", fingerprint.getFingerName());
             item.put("imageBase64", fingerprint.getImageBase64());
-            item.put("wsqPath", fingerprint.getWsqPath());
-            item.put("wsqSize", new File(fingerprint.getWsqPath()).length());
+            item.put("wsqBase64", fingerprint.getWsqBase64());
             array.put(item);
         }
         return array;
     }
 
-    /**
-     * Reads the WSQ file of a captured finger and returns it base64 encoded, so the WebView
-     * can upload or store the template. Runs off the WebView thread because a full hand is
-     * several megabytes. The finger images need no call - they arrive as imageBase64.
-     */
-    private void readFingerprintFile(JSONArray args, CallbackContext callback) {
-        final String path = args.optString(0, "");
-        if (path.isEmpty()) {
-            callback.error("path is required");
-            return;
-        }
-
-        cordova.getThreadPool().execute(() -> {
-            try {
-                File file = new File(path);
-                // Only the SDK's own capture files may be read this way.
-                String canonical = file.getCanonicalPath();
-                String cacheRoot = cordova.getActivity().getCacheDir().getCanonicalPath();
-                if (!canonical.startsWith(cacheRoot)) {
-                    callback.error("path is outside the app cache directory");
-                    return;
-                }
-                if (!file.exists()) {
-                    callback.error("file no longer exists: " + path);
-                    return;
-                }
-
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                FileInputStream input = new FileInputStream(file);
-                try {
-                    byte[] chunk = new byte[8192];
-                    int read;
-                    while ((read = input.read(chunk)) != -1) {
-                        buffer.write(chunk, 0, read);
-                    }
-                } finally {
-                    input.close();
-                }
-
-                callback.success(Base64.encodeToString(buffer.toByteArray(), Base64.NO_WRAP));
-            } catch (Exception e) {
-                callback.error("Could not read " + path + ": " + e.getMessage());
-            }
-        });
-    }
 
     private String generateToken(String apiKey, String endPoint) throws Exception {
         URL url = new URL(endPoint + "/generate-token/");

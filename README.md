@@ -48,7 +48,7 @@ Cordova/AGP/JDK changes the requirements substantially.
 | JDK | **8** |
 | Gradle | **6.5** (AGP 4.0.0 does not work on Gradle 7.x) |
 | Android Gradle Plugin | **4.0.0** (shipped by cordova-android 9.1.0) |
-| truID Android SDK | **8.0.9** (pulled from JitPack by the plugin) |
+| truID Android SDK | **8.0.9-beta** (pulled from JitPack by the plugin) |
 
 **Android SDK components required on the build machine:**
 - **Platform API 31** installed (compileSdk 31).
@@ -61,26 +61,27 @@ Cordova/AGP/JDK changes the requirements substantially.
 ## 3. Install the plugin
 
 Each truID SDK version has its own branch of this repo, so install the branch that
-matches the SDK you want. This guide documents **`sdk-v8.0.9`** (truID Android SDK
-8.0.9), which returns the fingerprint capture data — see
+matches the SDK you want. This guide documents **`sdk-v8.0.9-beta`** (truID Android
+SDK 8.0.9-beta), which returns the fingerprint capture data — see
 [§6](#6-fingerprint-data-android).
 
 | Plugin branch | truID Android SDK | Fingerprint data in the result |
 |---|---|---|
-| `sdk-v8.0.9` | 8.0.9 | yes, image inline as base64 |
+| `sdk-v8.0.9-beta` | 8.0.9-beta | yes — image **and** WSQ, both base64 |
+| `sdk-v8.0.9` | 8.0.9 | image base64, WSQ as a file path |
 | `sdk-v8.0.6` | 8.0.6 | no |
 
 From your project root:
 
 ```bash
-cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.0.9
+cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.0.9-beta
 # or from a local copy:
 cordova plugin add ../cordova-plugin-truid
 ```
 
 The plugin automatically brings:
 - the JavaScript bridge (`cordova.plugins.TruIDPlugin` / `cordova.exec`),
-- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.9`, from JitPack),
+- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.9-beta`, from JitPack),
 - the **dependency-version alignment** the SDK needs (compose, material, camera,
   lottie, okhttp, coroutines, etc.) so it builds under AGP 4.0.0,
 - the required Android permissions (Camera, Internet, Location).
@@ -187,14 +188,23 @@ export class HomePage {
 
 ## 6. Fingerprint data (Android)
 
-Requires truID Android SDK **8.0.9** or newer. When the session ran the
+Requires truID Android SDK **8.0.9-beta** or newer. When the session ran the
 fingerprint capture step, the result carries one entry per captured finger.
 
-The two halves of a capture travel differently. The **finger image** arrives
-inline as base64, so it can be rendered with nothing more than a data URI. The
-**WSQ template** stays a file in the app cache directory and only its path is
-handed over, because it is the larger of the two and most apps just upload it —
-fetch it with one explicit call when you need it.
+Both halves of a capture arrive inline as base64: the **finger image** for
+display, the **WSQ template** for matching or upload. Nothing is read off disk,
+so there is no cache lifetime to worry about.
+
+Under the hood the SDK hands these to the plugin **in memory**, not through the
+activity result intent. That matters because an intent result is parcelled
+through `system_server`, whose binder buffer is roughly 1 MB shared across every
+transaction in flight: a full eight-finger capture measured 780 KB and was
+rejected with `TransactionTooLargeException`, which silently drops the whole
+result and leaves the app looking hung. Passing references has no such ceiling,
+which is also how the iOS side has always worked. The one consequence is that
+the results do not survive process death — if Android kills the app while the
+capture screen is showing, the result reports `hasFingerprints` but the array is
+empty, and the capture has to be run again.
 
 ### Fingerprint entry fields
 | Field | Description |
@@ -202,8 +212,7 @@ fetch it with one explicit call when you need it.
 | `fingerIndex` | ANSI/NIST finger number, fixed per finger and independent of capture order: `1` right thumb, `2`–`5` right index/middle/ring/pinky, `6` left thumb, `7`–`10` left index/middle/ring/pinky |
 | `fingerName` | same value as a label, e.g. `"right_index"`, `"left_thumb"` |
 | `imageBase64` | the finger image, PNG encoded then base64 encoded, no `data:` prefix |
-| `wsqPath` | absolute path of the WSQ template for that finger |
-| `wsqSize` | size of the WSQ in bytes |
+| `wsqBase64` | the WSQ template of that finger, base64 encoded |
 
 ```json
 {
@@ -217,8 +226,7 @@ fetch it with one explicit call when you need it.
       "fingerIndex": 2,
       "fingerName": "right_index",
       "imageBase64": "iVBORw0KGgoAAAANSUhEUg...",
-      "wsqPath": "/data/user/0/<your.app.id>/cache/truIDFingerCapture/finger_2_5B7A....wsq",
-      "wsqSize": 38124
+      "wsqBase64": "//qA6gAAWZgA..."
     }
   ]
 }
@@ -252,7 +260,7 @@ export class HomePage {
           .map((finger: any) => ({
             index: finger.fingerIndex,
             name: finger.fingerName,
-            wsqPath: finger.wsqPath,
+            wsq: finger.wsqBase64,        // send this to your backend
             src: 'data:image/png;base64,' + finger.imageBase64
           }));
 
@@ -274,25 +282,24 @@ export class HomePage {
 Angular's URL sanitizer already allows `data:image/*`, so no `bypassSecurityTrust`
 call is needed.
 
-### Reading the WSQ template
+### The WSQ template
+
+`wsqBase64` is the biometric template — decode it and upload it, or forward the
+base64 string as-is:
 
 ```ts
-const wsqBase64 = await truid.readFingerprintFile(finger.wsqPath);
+const wsqBytes = atob(finger.wsqBase64);
 ```
 
-It returns the file **base64 encoded** and refuses any path outside the app cache.
+Two things to keep in mind:
 
-Three things to keep in mind:
-
-- **Fetch the WSQ while the result is fresh.** It lives in the cache directory, so
-  Android may delete it under storage pressure, and the SDK clears its own capture
-  files when the next session starts. Upload or copy anything you need to keep
-  (`cordova-plugin-file` can move it to persistent storage).
-- **WSQ is not an image.** It is the biometric template for matching or for sending
-  to a backend; `<img>` cannot display it. Decoding it needs a WSQ decoder.
-- **Watch the payload size.** The base64 images cross a binder transaction limited
-  to roughly 1 MB per process; eight fingers land around 450–600 KB. The SDK logs
-  the running total under the `wsq_size` tag and warns past 700 KB.
+- **WSQ is not an image.** `<img>` cannot display it; rendering it needs a WSQ
+  decoder. Use `imageBase64` for display and `wsqBase64` for matching.
+- **Read the results promptly.** They are held in memory for the session that
+  just finished and are cleared when the next one starts. Copy anything you need
+  to keep. For reference, a capture is roughly 90 KB of base64 per finger, about
+  750 KB for eight fingers — sizeable to hold, but no longer subject to any IPC
+  limit. The SDK logs the running total under the `wsq_size` tag.
 
 The iOS side of the plugin does not report fingerprints yet: `fingerprints` comes
 back as an empty array there.
