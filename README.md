@@ -56,6 +56,27 @@ Cordova/AGP/JDK changes the requirements substantially.
   which was removed in build-tools 31+.
 - An **Android NDK** installed (any recent version; the plugin auto-selects it).
 
+### What the plugin actually requires
+
+`plugin.xml` declares the minimum Cordova gate, which `cordova plugin add`
+enforces before it will install:
+
+```xml
+<engine name="cordova" version=">=10.0.0" />
+<engine name="cordova-android" version=">=9.1.0" />
+<engine name="cordova-ios" version=">=6.2.0" />
+```
+
+**AGP 8 is not required.** The 16 KB-alignment dependency swap in `truid.gradle`
+is *gated* on AGP 8.5+ **and** compileSdk 35+; on anything older it is a no-op
+and CameraX/TFLite resolve exactly as your host resolves them. The truID SDK
+declares androidx.camera **1.3.4**, which is what keeps AGP 4.x and 7.x hosts
+building. The trade-off on those hosts is that two third-party native libraries
+(`libimage_processing_util_jni.so` from CameraX, `libtensorflowlite_jni.so` from
+TFLite) stay 4 KB-laid-out, so a build that must satisfy Google Play's 16 KB
+page-size requirement needs AGP 8.5+ and compileSdk 35+. The SDK's own natives
+are already 16 KB-aligned either way.
+
 ---
 
 ## 3. Install the plugin
