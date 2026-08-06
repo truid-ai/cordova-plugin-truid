@@ -67,7 +67,15 @@ enforces before it will install:
 <engine name="cordova-ios" version=">=6.2.0" />
 ```
 
-**AGP 8 is not required.** The 16 KB-alignment dependency swap in `truid.gradle`
+**AGP 8 is not required, and neither is a particular apply order.** The gradle
+file never touches the `android { }` extension at the top level — it wraps that
+work in `project.plugins.withId('com.android.application')`, because Cordova
+applies plugin gradle files at a position it chooses, and on some hosts that is
+before `apply plugin: 'com.android.application'`. Applying it there without the
+guard fails the whole build with
+`No signature of method: build_xxxxx.android()`.
+
+The 16 KB-alignment dependency swap in `truid.gradle`
 is *gated* on AGP 8.5+ **and** compileSdk 35+; on anything older it is a no-op
 and CameraX/TFLite resolve exactly as your host resolves them. The truID SDK
 declares androidx.camera **1.3.4**, which is what keeps AGP 4.x and 7.x hosts

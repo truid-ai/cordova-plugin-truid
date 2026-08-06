@@ -178,17 +178,29 @@ configurations.all {
     }
 }
 
-android {
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    // The SDK embeds OpenCV natives and also pulls quickbirdstudios:opencv
-    // transitively; both ship the same .so. Keep one copy instead of failing
-    // the merge. (`packagingOptions` is the spelling that works on AGP 7 & 8.)
-    packagingOptions {
-        pickFirst 'lib/**/libc++_shared.so'
-        pickFirst 'lib/**/libopencv_java4.so'
-        pickFirst 'lib/**/libopencv_info.so'
+// Do NOT call android { } at the top level here. Cordova decides where in the
+// generated app/build.gradle this file gets applied, and on some hosts that is
+// before `apply plugin: 'com.android.application'`, at which point the android
+// extension does not exist yet and Gradle fails the whole build with:
+//
+//   No signature of method: build_xxxxx.android() is applicable for argument
+//   types: (build_xxxxx$_run_closure7)
+//
+// withId() runs the block immediately when the plugin is already applied, and
+// defers it until it is otherwise, so the ordering stops mattering.
+project.plugins.withId('com.android.application') {
+    android {
+        compileOptions {
+            sourceCompatibility JavaVersion.VERSION_1_8
+            targetCompatibility JavaVersion.VERSION_1_8
+        }
+        // The SDK embeds OpenCV natives and also pulls quickbirdstudios:opencv
+        // transitively; both ship the same .so. Keep one copy instead of failing
+        // the merge. (`packagingOptions` is the spelling that works on AGP 7 & 8.)
+        packagingOptions {
+            pickFirst 'lib/**/libc++_shared.so'
+            pickFirst 'lib/**/libopencv_java4.so'
+            pickFirst 'lib/**/libopencv_info.so'
+        }
     }
 }
