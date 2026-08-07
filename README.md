@@ -102,15 +102,17 @@ SDK 8.1.0-beta), which returns the fingerprint capture data — see
 | Plugin branch | truID Android SDK | compileSdk | Fingerprint data in the result |
 |---|---|---|---|
 | `sdk-v8.1.0-beta` | 8.1.0-beta | **30** | yes — image **and** WSQ, both base64 |
-| `sdk-v8.0.9-beta` | 8.0.9-beta | 35+ | yes — image **and** WSQ, both base64 |
-| `sdk-v8.0.9` | 8.0.9 | 35+ | image base64, WSQ as a file path |
 | `sdk-v8.0.6` | 8.0.6 | 35+ | no |
 
-`sdk-v8.1.0-beta` is a permanent fork for hosts that cannot raise `compileSdk` past 30,
-not a successor to `sdk-v8.0.9-beta`. It pins AndroidX to the newest versions that
-still link against the API 30 `android.jar` (core 1.6.0, activity and appcompat
-1.3.1, Compose 1.1.1, CameraX 1.1.0-alpha08). On a host that can compile against
-API 31 or later, use `sdk-v8.0.9-beta`.
+`sdk-v8.1.0-beta` is a permanent fork for hosts that cannot raise `compileSdk` past 30.
+It pins AndroidX to the newest versions that still link against the API 30
+`android.jar` (core 1.6.0, activity and appcompat 1.3.1, Compose 1.1.1,
+CameraX 1.1.0-alpha08).
+
+The `sdk-v8.0.8-beta`, `sdk-v8.0.9` and `sdk-v8.0.9-beta` branches have been removed.
+Their commits are preserved in `sdk-v8.1.0-beta`, which they are ancestors of, so the
+history is intact — but `cordova plugin add …#sdk-v8.0.9` and the other deleted names no
+longer resolve.
 
 From your project root:
 
@@ -235,7 +237,7 @@ export class HomePage {
 
 ## 6. Fingerprint data (Android)
 
-Requires truID Android SDK **8.0.9-beta** / **8.1.0** or newer. When the session ran the
+Requires truID Android SDK **8.1.0-beta** or newer. When the session ran the
 fingerprint capture step, the result carries one entry per captured finger.
 
 Both halves of a capture arrive inline as base64: the **finger image** for
