@@ -71,31 +71,35 @@ public class TruIDPlugin extends CordovaPlugin {
             try {
                 TruID.INSTANCE.setAPILink(endPoint);
 
+                // Flow for THIS integrator. The JS bridge only carries apiKey and
+                // endPoint, so these are fixed here on purpose - this branch serves one
+                // client and each client gets its own branch. Anyone reusing this file
+                // for a different integrator must revisit every flag below.
                 AuthenticateWithTruID.Input input = new AuthenticateWithTruID.Input(
                     token,
                     true,  // enableFaceLiveness
-                    false, // enableOnDeviceLiveness
+                    false, // enableOnDeviceLiveness - alternative to face liveness, not additive
                     true,  // enableDocumentCapture
-                    false, // enableExtractData
-                    false, // enableDocumentAuthenticity
+                    true,  // enableExtractData
+                    false, // enableDocumentAuthenticity - not used by this integrator
                     true,  // enableDocumentBacksideCapture
-                    true,  // enableIDtoSelfieMatching
-                    false, // enableVerisysVerification
-                    false, // enableFingerSelection
+                    false, // enableIDtoSelfieMatching - not used by this integrator
+                    true,  // enableVerisysVerification
+                    true,  // enableFingerSelection
                     true,  // enableFingerprintCapture
-                    false, // enablePersonalInformationVerification
-                    false, // enableMobileNumberVerification
-                    false, // enableUndertaking
-                    false, // enableAccountOptions
-                    false, // enableAgentVerification
+                    true,  // enablePersonalInformationVerification
+                    true,  // enableMobileNumberVerification
+                    true,  // enableUndertaking
+                    true,  // enableAccountOptions
+                    false, // enableAgentVerification - requires a live operator
                     true,  // displayHelpScreens
                     new FingerprintOptions(
                         FingersToScan.LEFT_4_Right_4,
                         30,    // minimumNIST
                         false  // displayFingerprintResults
                     ),
-                    false, // enableReportScreen
-                    false, // disableLocationCapture
+                    true,  // enableReportScreen
+                    true,  // disableLocationCapture - keeps the location permission prompt away
                     false, // displayFingerprintHelpPopup
                     false  // shouldShowStartScreen
                 );
