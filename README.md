@@ -48,10 +48,10 @@ Cordova/AGP/JDK changes the requirements substantially.
 | JDK | **8** |
 | Gradle | **6.5** (AGP 4.0.0 does not work on Gradle 7.x) |
 | Android Gradle Plugin | **4.0.0** (shipped by cordova-android 9.1.0) |
-| truID Android SDK | **8.1.0** (pulled from JitPack by the plugin) |
+| truID Android SDK | **8.1.0-beta** (pulled from JitPack by the plugin) |
 
 **Android SDK components required on the build machine:**
-- **Platform API 30** installed (compileSdk 30). SDK 8.1.0 is built for
+- **Platform API 30** installed (compileSdk 30). SDK 8.1.0-beta is built for
   compileSdk 30, so API 31 is no longer needed.
 - **Build-tools that still include `dx`** (≤ `30.0.3`) — AGP 4.0.0 requires `dx`,
   which was removed in build-tools 31+.
@@ -92,12 +92,12 @@ are already 16 KB-aligned either way.
 
 Each truID SDK version has its own branch of this repo, so install the branch that
 matches the SDK you want. This guide documents **`sdk-v8.1.0`** (truID Android
-SDK 8.1.0), which returns the fingerprint capture data — see
+SDK 8.1.0-beta), which returns the fingerprint capture data — see
 [§6](#6-fingerprint-data-android).
 
 | Plugin branch | truID Android SDK | compileSdk | Fingerprint data in the result |
 |---|---|---|---|
-| `sdk-v8.1.0` | 8.1.0 | **30** | yes — image **and** WSQ, both base64 |
+| `sdk-v8.1.0` | 8.1.0-beta | **30** | yes — image **and** WSQ, both base64 |
 | `sdk-v8.0.9-beta` | 8.0.9-beta | 35+ | yes — image **and** WSQ, both base64 |
 | `sdk-v8.0.9` | 8.0.9 | 35+ | image base64, WSQ as a file path |
 | `sdk-v8.0.6` | 8.0.6 | 35+ | no |
@@ -118,7 +118,7 @@ cordova plugin add ../cordova-plugin-truid
 
 The plugin automatically brings:
 - the JavaScript bridge (`cordova.plugins.TruIDPlugin` / `cordova.exec`),
-- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.1.0`, from JitPack),
+- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.1.0-beta`, from JitPack),
 - the **dependency-version alignment** the SDK needs (compose, material, camera,
   lottie, okhttp, coroutines, etc.) so it builds under AGP 4.0.0/4.1.3,
 - `android.useAndroidX=true` in the generated `gradle.properties`,

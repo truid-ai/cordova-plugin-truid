@@ -21,7 +21,7 @@ repositories {
 }
 
 dependencies {
-    // 8.1.0 is the compileSdk 30 build of the 8.0.9-beta feature set. Same fingerprint
+    // 8.1.0-beta is the compileSdk 30 build of the 8.0.9-beta feature set. Same fingerprint
     // behaviour - results come back through AuthenticateWithTruID.Output
     // .getFingerprints() with image and WSQ both base64, handed over in memory
     // rather than in the result intent, because a full eight finger capture parcels
@@ -31,7 +31,7 @@ dependencies {
     // Compose 1.1.1 / CameraX 1.1.0-alpha08 so that it can be consumed at
     // compileSdk 30. This is a permanent fork of the modern line, not a successor:
     // do not use it on a host that can compile against API 31 or later.
-    implementation "com.github.truid-ai:android-sdk:8.1.0"
+    implementation "com.github.truid-ai:android-sdk:8.1.0-beta"
     // TruIDPlugin.java references AuthenticateWithTruID, which extends androidx
     // activity's ActivityResultContract. The SDK scopes androidx.activity as
     // `implementation`, so it is not on the plugin's compile classpath by
