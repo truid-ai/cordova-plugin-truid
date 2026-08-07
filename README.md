@@ -88,21 +88,25 @@ are already 16 KB-aligned either way.
 
 ---
 
+> **Integrating into an existing app?** [INTEGRATION.md](INTEGRATION.md) is the short
+> version: the exact versions this branch was built against, the single command to add it,
+> and the JavaScript call plus result shape. Everything below is the longer reference.
+
 ## 3. Install the plugin
 
 Each truID SDK version has its own branch of this repo, so install the branch that
-matches the SDK you want. This guide documents **`sdk-v8.1.0`** (truID Android
+matches the SDK you want. This guide documents **`sdk-v8.1.0-beta`** (truID Android
 SDK 8.1.0-beta), which returns the fingerprint capture data — see
 [§6](#6-fingerprint-data-android).
 
 | Plugin branch | truID Android SDK | compileSdk | Fingerprint data in the result |
 |---|---|---|---|
-| `sdk-v8.1.0` | 8.1.0-beta | **30** | yes — image **and** WSQ, both base64 |
+| `sdk-v8.1.0-beta` | 8.1.0-beta | **30** | yes — image **and** WSQ, both base64 |
 | `sdk-v8.0.9-beta` | 8.0.9-beta | 35+ | yes — image **and** WSQ, both base64 |
 | `sdk-v8.0.9` | 8.0.9 | 35+ | image base64, WSQ as a file path |
 | `sdk-v8.0.6` | 8.0.6 | 35+ | no |
 
-`sdk-v8.1.0` is a permanent fork for hosts that cannot raise `compileSdk` past 30,
+`sdk-v8.1.0-beta` is a permanent fork for hosts that cannot raise `compileSdk` past 30,
 not a successor to `sdk-v8.0.9-beta`. It pins AndroidX to the newest versions that
 still link against the API 30 `android.jar` (core 1.6.0, activity and appcompat
 1.3.1, Compose 1.1.1, CameraX 1.1.0-alpha08). On a host that can compile against
@@ -111,7 +115,7 @@ API 31 or later, use `sdk-v8.0.9-beta`.
 From your project root:
 
 ```bash
-cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.1.0
+cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.1.0-beta
 # or from a local copy:
 cordova plugin add ../cordova-plugin-truid
 ```
