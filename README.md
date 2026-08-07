@@ -48,10 +48,11 @@ Cordova/AGP/JDK changes the requirements substantially.
 | JDK | **8** |
 | Gradle | **6.5** (AGP 4.0.0 does not work on Gradle 7.x) |
 | Android Gradle Plugin | **4.0.0** (shipped by cordova-android 9.1.0) |
-| truID Android SDK | **8.0.9-beta** (pulled from JitPack by the plugin) |
+| truID Android SDK | **8.1.0** (pulled from JitPack by the plugin) |
 
 **Android SDK components required on the build machine:**
-- **Platform API 31** installed (compileSdk 31).
+- **Platform API 30** installed (compileSdk 30). SDK 8.1.0 is built for
+  compileSdk 30, so API 31 is no longer needed.
 - **Build-tools that still include `dx`** (≤ `30.0.3`) — AGP 4.0.0 requires `dx`,
   which was removed in build-tools 31+.
 - An **Android NDK** installed (any recent version; the plugin auto-selects it).
@@ -90,30 +91,43 @@ are already 16 KB-aligned either way.
 ## 3. Install the plugin
 
 Each truID SDK version has its own branch of this repo, so install the branch that
-matches the SDK you want. This guide documents **`sdk-v8.0.9-beta`** (truID Android
-SDK 8.0.9-beta), which returns the fingerprint capture data — see
+matches the SDK you want. This guide documents **`sdk-v8.1.0`** (truID Android
+SDK 8.1.0), which returns the fingerprint capture data — see
 [§6](#6-fingerprint-data-android).
 
-| Plugin branch | truID Android SDK | Fingerprint data in the result |
-|---|---|---|
-| `sdk-v8.0.9-beta` | 8.0.9-beta | yes — image **and** WSQ, both base64 |
-| `sdk-v8.0.9` | 8.0.9 | image base64, WSQ as a file path |
-| `sdk-v8.0.6` | 8.0.6 | no |
+| Plugin branch | truID Android SDK | compileSdk | Fingerprint data in the result |
+|---|---|---|---|
+| `sdk-v8.1.0` | 8.1.0 | **30** | yes — image **and** WSQ, both base64 |
+| `sdk-v8.0.9-beta` | 8.0.9-beta | 35+ | yes — image **and** WSQ, both base64 |
+| `sdk-v8.0.9` | 8.0.9 | 35+ | image base64, WSQ as a file path |
+| `sdk-v8.0.6` | 8.0.6 | 35+ | no |
+
+`sdk-v8.1.0` is a permanent fork for hosts that cannot raise `compileSdk` past 30,
+not a successor to `sdk-v8.0.9-beta`. It pins AndroidX to the newest versions that
+still link against the API 30 `android.jar` (core 1.6.0, activity and appcompat
+1.3.1, Compose 1.1.1, CameraX 1.1.0-alpha08). On a host that can compile against
+API 31 or later, use `sdk-v8.0.9-beta`.
 
 From your project root:
 
 ```bash
-cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.0.9-beta
+cordova plugin add https://github.com/truid-ai/cordova-plugin-truid#sdk-v8.1.0
 # or from a local copy:
 cordova plugin add ../cordova-plugin-truid
 ```
 
 The plugin automatically brings:
 - the JavaScript bridge (`cordova.plugins.TruIDPlugin` / `cordova.exec`),
-- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.0.9-beta`, from JitPack),
+- the truID SDK dependency (`com.github.truid-ai:android-sdk:8.1.0`, from JitPack),
 - the **dependency-version alignment** the SDK needs (compose, material, camera,
-  lottie, okhttp, coroutines, etc.) so it builds under AGP 4.0.0,
+  lottie, okhttp, coroutines, etc.) so it builds under AGP 4.0.0/4.1.3,
+- `android.useAndroidX=true` in the generated `gradle.properties`,
+- suppression of AGP's `checkAarMetadata`, which would otherwise reject Compose
+  1.1.1 and friends at compileSdk 30 (they declare `minCompileSdk=31` but carry no
+  API 31 resources),
 - the required Android permissions (Camera, Internet, Location).
+
+Nothing has to be changed in the host project by hand.
 
 ---
 
@@ -217,7 +231,7 @@ export class HomePage {
 
 ## 6. Fingerprint data (Android)
 
-Requires truID Android SDK **8.0.9-beta** or newer. When the session ran the
+Requires truID Android SDK **8.0.9-beta** / **8.1.0** or newer. When the session ran the
 fingerprint capture step, the result carries one entry per captured finger.
 
 Both halves of a capture arrive inline as base64: the **finger image** for
