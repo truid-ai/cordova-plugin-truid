@@ -5,9 +5,14 @@
 // they differ per host app - the plugin's hooks/android-agp8-namespace.js
 // injects them into the generated build files instead.
 //
-// Design rule for everything below: this file is merged into SOMEONE ELSE'S
-// app build, so it must never downgrade a host that is already ahead. Version
-// nudges are raise-only (eachDependency), not hard `force` pins.
+// Design rule on the modern branches: this file is merged into SOMEONE ELSE'S app
+// build, so it must never downgrade a host that is already ahead, and version
+// nudges are raise-only (eachDependency) rather than hard `force` pins.
+//
+// THIS BRANCH IS DIFFERENT. compileSdk 30 imposes a hard ceiling on AndroidX, so
+// the pins below are deliberate downgrades and are NOT raise-only. That is only
+// correct because the host is known to be stuck at compileSdk 30; on any host that
+// can compile against API 31+, use the modern plugin branch instead.
 
 repositories {
     google()          // also serves com.google.ai.edge.litert (16 KB-aligned TFLite)
@@ -16,20 +21,30 @@ repositories {
 }
 
 dependencies {
-    // 8.0.9-beta returns the fingerprint capture results through
-    // AuthenticateWithTruID.Output.getFingerprints(), image and WSQ both base64. The
-    // results are handed over in memory rather than inside the result intent, because
-    // a full eight finger capture parcels to about 780 KB and system_server rejects it
-    // with TransactionTooLargeException. Unlike 8.0.6-beta it declares androidx.camera
-    // 1.3.4, so it also builds on the AGP 4.0.0 / cordova-android 9.1.0 host described
-    // in section 2 of the README.
-    implementation "com.github.truid-ai:android-sdk:8.0.9-beta"
+    // 8.1.0 is the compileSdk 30 build of the 8.0.9-beta feature set. Same fingerprint
+    // behaviour - results come back through AuthenticateWithTruID.Output
+    // .getFingerprints() with image and WSQ both base64, handed over in memory
+    // rather than in the result intent, because a full eight finger capture parcels
+    // to about 780 KB and system_server rejects it with TransactionTooLargeException.
+    //
+    // It is built against androidx.core 1.6.0 / activity 1.3.1 / appcompat 1.3.1 /
+    // Compose 1.1.1 / CameraX 1.1.0-alpha08 so that it can be consumed at
+    // compileSdk 30. This is a permanent fork of the modern line, not a successor:
+    // do not use it on a host that can compile against API 31 or later.
+    implementation "com.github.truid-ai:android-sdk:8.1.0"
     // TruIDPlugin.java references AuthenticateWithTruID, which extends androidx
     // activity's ActivityResultContract. The SDK scopes androidx.activity as
     // `implementation`, so it is not on the plugin's compile classpath by
     // default -> "cannot access ActivityResultContract". Add it explicitly.
-    implementation "androidx.activity:activity:1.8.2"
-    implementation "androidx.activity:activity-ktx:1.8.2"
+    //
+    // 1.3.1, NOT 1.8.2: androidx.activity 1.4.0+ implements
+    // androidx.core.view.MenuHost, which only exists from core 1.7.0, and core 1.7.0
+    // cannot be used at compileSdk 30 (it declares android:attr/lStar). Requesting
+    // 1.8.2 here raises activity for the whole app and ComponentActivity then fails
+    // verification at runtime with
+    // "NoClassDefFoundError: androidx.activity.ComponentActivity".
+    implementation "androidx.activity:activity:1.3.1"
+    implementation "androidx.activity:activity-ktx:1.3.1"
 }
 
 // ---------------------------------------------------------------------------
@@ -202,5 +217,112 @@ project.plugins.withId('com.android.application') {
             pickFirst 'lib/**/libopencv_java4.so'
             pickFirst 'lib/**/libopencv_info.so'
         }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// compileSdk 30 compatibility
+//
+// AGP 4.1 introduced checkDebugAarMetadata, which enforces every AAR's declared
+// minCompileSdk in the APPLICATION module. Compose 1.1.1, lifecycle 2.4.0 and
+// navigation 2.4.2 declare minCompileSdk=31, so the host build fails before it
+// compiles anything. None of them actually references an API 31 resource - the
+// whole resolved graph was checked for res/values-v31 and for android:attr/lStar -
+// so the declaration is a policy marker here and the check is safe to skip.
+//
+// Without this block the build stops with:
+//   Dependency 'androidx.compose.material:material:1.1.1' requires libraries and
+//   applications that depend on it to compile against version 31 or later
+// ---------------------------------------------------------------------------
+project.plugins.withId('com.android.application') {
+    project.tasks.configureEach { t ->
+        if (t.name ==~ /check.*AarMetadata/) { t.enabled = false }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// The AndroidX ceiling for compileSdk 30.
+//
+// androidx.core 1.7.0 is the wall. It declares android:attr/lStar, absent from the
+// API 30 android.jar, so resource linking fails with
+// "resource android:attr/lStar not found". The same release adds
+// androidx.core.view.MenuHost, which androidx.activity 1.4.0+ implements, so
+// holding core at 1.6.0 also caps activity and appcompat at 1.3.1 and Compose
+// at 1.1.1.
+//
+// These are `force`, not raise-only nudges, because declaring the versions is not
+// enough: material, mlkit, lottie and camera-view all request a newer appcompat,
+// and Gradle's conflict resolution then selects appcompat 1.6.1 and drags core up
+// to 1.9.0. Other plugins in the host app will do the same.
+//
+// Keep this list identical to sdk/build.gradle on the SDK's
+// dib-client-compilesdk30 branch.
+// ---------------------------------------------------------------------------
+configurations.all {
+    resolutionStrategy {
+        force "androidx.core:core:1.6.0"
+        force "androidx.core:core-ktx:1.6.0"
+        force "androidx.appcompat:appcompat:1.3.1"
+        force "androidx.appcompat:appcompat-resources:1.3.1"
+        force "androidx.activity:activity:1.3.1"
+        force "androidx.activity:activity-ktx:1.3.1"
+        force "androidx.activity:activity-compose:1.3.1"
+        force "androidx.fragment:fragment:1.3.6"
+        force "androidx.fragment:fragment-ktx:1.3.6"
+        force "androidx.savedstate:savedstate:1.1.0"
+        force "androidx.savedstate:savedstate-ktx:1.1.0"
+        force "androidx.lifecycle:lifecycle-common:2.4.0"
+        force "androidx.lifecycle:lifecycle-runtime:2.4.0"
+        force "androidx.lifecycle:lifecycle-runtime-ktx:2.4.0"
+        force "androidx.lifecycle:lifecycle-viewmodel:2.4.0"
+        force "androidx.lifecycle:lifecycle-viewmodel-ktx:2.4.0"
+        force "androidx.lifecycle:lifecycle-viewmodel-compose:2.4.0"
+        force "androidx.lifecycle:lifecycle-viewmodel-savedstate:2.4.0"
+        force "androidx.lifecycle:lifecycle-livedata:2.4.0"
+        force "androidx.lifecycle:lifecycle-livedata-core:2.4.0"
+        force "androidx.lifecycle:lifecycle-livedata-core-ktx:2.4.0"
+        force "androidx.lifecycle:lifecycle-process:2.4.0"
+        force "androidx.arch.core:core-runtime:2.1.0"
+
+        // material 1.5.0+ ships res/values-v31 referencing android:color/system_*
+        // (Android 12 dynamic colour), and 1.7.0+ adds AAPT2 <macro> tags that
+        // build-tools 30.0.3 cannot parse. 1.4.0 has neither.
+        force "com.google.android.material:material:1.4.0"
+
+        force "androidx.compose.runtime:runtime:1.1.1"
+        force "androidx.compose.runtime:runtime-saveable:1.1.1"
+        force "androidx.compose.ui:ui:1.1.1"
+        force "androidx.compose.ui:ui-graphics:1.1.1"
+        force "androidx.compose.ui:ui-text:1.1.1"
+        force "androidx.compose.ui:ui-unit:1.1.1"
+        force "androidx.compose.ui:ui-util:1.1.1"
+        force "androidx.compose.ui:ui-geometry:1.1.1"
+        force "androidx.compose.ui:ui-tooling-preview:1.1.1"
+        force "androidx.compose.foundation:foundation:1.1.1"
+        force "androidx.compose.foundation:foundation-layout:1.1.1"
+        force "androidx.compose.animation:animation:1.1.1"
+        force "androidx.compose.animation:animation-core:1.1.1"
+        force "androidx.compose.material:material:1.1.1"
+        force "androidx.compose.material:material-ripple:1.1.1"
+        force "androidx.compose.material:material-icons-core:1.1.1"
+        force "androidx.compose.material:material-icons-extended:1.1.1"
+        force "androidx.navigation:navigation-common:2.4.2"
+        force "androidx.navigation:navigation-common-ktx:2.4.2"
+        force "androidx.navigation:navigation-runtime:2.4.2"
+        force "androidx.navigation:navigation-runtime-ktx:2.4.2"
+        force "androidx.navigation:navigation-compose:2.4.2"
+
+        // 1.1.0-alpha08 is the last CameraX release that declares minCompileSdk=30
+        // and still has ImageAnalysis.setOutputImageFormat, so the SDK's analysis
+        // stream stays single-plane RGBA_8888. Anything newer breaks the ceiling;
+        // 1.0.2 drops setOutputImageFormat and would hand the detectors YUV frames.
+        force "androidx.camera:camera-core:1.1.0-alpha08"
+        force "androidx.camera:camera-camera2:1.1.0-alpha08"
+        force "androidx.camera:camera-lifecycle:1.1.0-alpha08"
+        force "androidx.camera:camera-view:1.0.0-alpha28"
+
+        // appcompat 1.4+ pulls emoji2, which declares minCompileSdk 32 and is not
+        // used by appcompat 1.3.1.
+        exclude group: 'androidx.emoji2'
     }
 }
